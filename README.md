@@ -1,94 +1,89 @@
-# ternary-mesh: Dynamic mesh networking between agents with ternary-weighted connections
+# ternary-mesh
 
-## Why This Exists
+**Dynamic mesh networking between agents with ternary-weighted connections**
 
-In a fleet of agents moving between rooms, connectivity is fragile. Rooms come and go, agents relocate, and the network topology shifts constantly. Standard graph libraries assume a static structure; a fleet mesh needs to detect broken links, route around failures, and propagate information through whatever path is available — all while tracking whether each connection is healthy, degraded, or hostile.
+[![ternary](https://img.shields.io/badge/ecosystem-ternary-blue)](https://github.com/orgs/SuperInstance/repositories?q=ternary)
+[![tests](https://img.shields.io/badge/tests-23-green)]()
 
-Ternary weights (negative, neutral, positive) give each link a quality signal beyond "up or down," letting routers prefer reliable paths and healers prioritize repairing the worst connections first.
+## Overview
 
-## Core Concepts
+Dynamic mesh networking between agents with ternary-weighted connections.
 
-- **Ternary weight**: Each mesh edge carries a value of `Neg` (-1), `Zero` (0), or `Pos` (+1), representing connection quality from hostile to healthy.
-- **MeshNode**: An agent or room participating in the mesh. Each has a unique `NodeId` and can be active or inactive.
-- **MeshEdge**: A directed connection between two nodes with a ternary weight and an alive/dead flag.
-- **MeshRouter**: Finds paths through the mesh using BFS, preferring positive-weight edges.
-- **MeshHealer**: Detects dead edges and repairs them, with a configurable attempt limit.
-- **MeshPartitions**: Identifies disconnected groups (partitions) when the mesh splits, using flood fill.
-- **MeshGossip**: Epidemic-style information propagation with a configurable hop limit to prevent infinite forwarding.
+## Architecture
 
-## Quick Start
+- **`NodeId`** — core data structure
+- **`MeshNode`** — core data structure
+- **`MeshEdge`** — core data structure
+- **`MeshRouter`** — core data structure
+- **`MeshHealer`** — core data structure
+- **`MeshPartitions`** — core data structure
+- **`MeshGossip`** — core data structure
+- **`GossipMessage`** — core data structure
+- **`Ternary`** — state enumeration
+
+### Key Functions
+
+- `from_i8()`
+- `to_i8()`
+- `new()`
+- `new()`
+- `is_bidirectional()`
+- `new()`
+- `add_node()`
+- `add_edge()`
+- `remove_node()`
+- `find_path()`
+- ... and 19 more
+
+## Why Ternary?
+
+The balanced ternary system {-1, 0, +1} (also known as Z₃) is the mathematically optimal discrete encoding:
+- **More expressive than binary**: three states capture positive, neutral, and negative
+- **Natural for decisions**: accept/reject/abstain, buy/hold/sell, agree/disagree/neutral
+- **Self-balancing**: the 0 state acts as a universal screen, preventing pathological lock-in
+- **Z₃ cyclic dynamics**: rock-paper-scissors is the only natural coordination mechanism
+
+## Stats
+
+| Metric | Value |
+|--------|-------|
+| Lines of Rust | 605 |
+| Test count | 23 |
+| Public types | 9 |
+| Public functions | 29 |
+
+## Ecosystem
+
+This crate is part of the **[SuperInstance Ternary Fleet](https://github.com/orgs/SuperInstance/repositories?q=ternary)**:
+
+- **[ternary-core](https://github.com/SuperInstance/ternary-core)** — shared traits and Z₃ arithmetic
+- **[ternary-grid](https://github.com/SuperInstance/ternary-grid)** — spatial grid with {-1, 0, +1} cells
+- **[ternary-graph](https://github.com/SuperInstance/ternary-graph)** — ternary-weighted graph algorithms
+- **[ternary-automata](https://github.com/SuperInstance/ternary-automata)** — three-state cellular automata
+- **[ternary-compiler](https://github.com/SuperInstance/ternary-compiler)** — expression compiler and optimizer
+
+200+ crates. 4,300+ tests. One pattern.
+
+## Research Context
+
+The ternary approach connects to several active research areas:
+- **Ternary Neural Networks** (TNNs): weights constrained to {-1, 0, +1} for efficient inference
+- **Huawei's ternary chip**: 7nm ternary silicon with 60% less power consumption
+- **Active inference**: free energy minimization naturally maps to ternary action selection
+- **Cyclic dominance**: RPS dynamics maintain biodiversity in spatial ecology
+- **Z₃ group theory**: the only algebraic group on three elements is cyclic addition mod 3
+
+## Usage
 
 ```toml
 [dependencies]
-ternary-mesh = "0.1"
+ternary-mesh = "0.1.0"
 ```
 
 ```rust
-use ternary_mesh::*;
-
-let mut router = MeshRouter::new();
-router.add_node(MeshNode::new(1, "agent-alpha"));
-router.add_node(MeshNode::new(2, "room-bravo"));
-router.add_node(MeshNode::new(3, "agent-charlie"));
-
-router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
-router.add_edge(MeshEdge::new(NodeId(2), NodeId(3), Ternary::Pos));
-
-if let Some(path) = router.find_path(NodeId(1), NodeId(3)) {
-    println!("Route found with {} hops", path.len() - 1);
-}
+use ternary_mesh;
 ```
-
-## API Overview
-
-| Type | Description |
-|------|-------------|
-| `MeshNode` | Agent or room in the mesh, identified by `NodeId` |
-| `MeshEdge` | Directed connection with ternary weight and alive flag |
-| `MeshRouter` | BFS pathfinding that prefers positive-weight edges |
-| `MeshHealer` | Detects and repairs dead edges up to a configurable limit |
-| `MeshPartitions` | Finds disconnected groups via flood fill |
-| `MeshGossip` | Hop-limited epidemic message propagation |
-| `GossipMessage` | A single gossip payload with origin, hops counter, and ID |
-
-## How It Works
-
-Pathfinding uses breadth-first search over alive edges, sorted so positive-weight edges are explored first. This doesn't guarantee shortest-path optimality but biases routes toward healthy connections without requiring a full weighted shortest-path algorithm.
-
-Partition detection runs flood fill from each unvisited node, collecting reachable nodes into groups. This is O(V + E) and can be expensive for large meshes; it's best run periodically rather than on every message.
-
-Gossip propagation is epidemic: each node forwards messages to its neighbors, incrementing a hop counter. The `max_hops` parameter prevents messages from circulating forever. Duplicate detection uses a `seen_ids` set, so a node won't re-process a message it has already handled.
-
-The healer iterates over dead edges and revives them with a neutral weight, up to `max_repair_attempts`. It doesn't validate whether a repaired connection actually works — that requires external health checks.
-
-## Known Limitations
-
-- Pathfinding uses BFS with a heuristic sort rather than Dijkstra; it may not find the truly optimal weighted path.
-- `find_path` uses a fixed-size array (256 entries) for visited/parent tracking; node IDs above 255 will be ignored.
-- Partition detection is O(V + E) and allocates a new `HashSet` per call; not suitable for per-message invocation on large meshes.
-- Gossip doesn't support message expiry or TTL-based cleanup; `seen_ids` grows without bound.
-- The healer revives edges with neutral weight regardless of previous quality; it has no memory of historical edge reliability.
-
-## Use Cases
-
-- **Fleet connectivity monitoring**: Track which agents can reach which rooms and detect when partitions form.
-- **Message routing in dynamic topologies**: Route commands through the best-available path when rooms are joining and leaving.
-- **Health propagation**: Use gossip to broadcast "room X is degraded" to the entire fleet without a central broker.
-- **Self-healing networks**: Periodically run the healer to automatically restore connections after transient failures.
-
-## Ecosystem Context
-
-Part of the SuperInstance ternary crate family. Works alongside `ternary-channel` (communication primitives) and `ternary-beacon` (service discovery). The mesh provides the routing layer that higher-level fleet communication builds on.
 
 ## License
 
 MIT
-
-## See Also
-- **ternary-network** — related
-- **ternary-graph** — related
-- **ternary-topology** — related
-- **ternary-beacon** — related
-- **ternary-channel** — related
-- **ternary-bridge** — related
-
