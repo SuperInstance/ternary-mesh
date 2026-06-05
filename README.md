@@ -83,3 +83,12 @@ Part of the SuperInstance ternary crate family. Works alongside `ternary-channel
 ## License
 
 MIT
+
+## See Also
+- **ternary-network** — related
+- **ternary-graph** — related
+- **ternary-topology** — related
+- **ternary-beacon** — related
+- **ternary-channel** — related
+- **ternary-bridge** — related
+
