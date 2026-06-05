@@ -1,0 +1,6 @@
+[package]
+name = "ternary-mesh"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Dynamic mesh networking between agents with ternary-weighted connections"
