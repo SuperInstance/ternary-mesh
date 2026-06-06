@@ -2,26 +2,24 @@
 
 //! Dynamic mesh networking between agents with ternary-weighted connections.
 
-/// Ternary value: Negative, Neutral, or Positive connection weight.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Ternary {
-    Neg = -1,
-    Zero = 0,
-    Pos = 1,
+/// Canonical ternary type re-exported from `ternary-types`.
+pub use ternary_types::Ternary;
+
+/// Extension trait providing methods previously defined on the custom `Ternary` type.
+pub trait TernaryExt: Sized {
+    /// Create a `Ternary` from an `i8` value (-1, 0, or 1).
+    fn from_i8(v: i8) -> Option<Self>;
+    /// Return the `i8` value of this ternary state.
+    fn to_i8(self) -> i8;
 }
 
-impl Ternary {
-    pub fn from_i8(v: i8) -> Option<Self> {
-        match v {
-            -1 => Some(Ternary::Neg),
-            0 => Some(Ternary::Zero),
-            1 => Some(Ternary::Pos),
-            _ => None,
-        }
+impl TernaryExt for ternary_types::Ternary {
+    fn from_i8(v: i8) -> Option<Self> {
+        Self::try_from(v).ok()
     }
 
-    pub fn to_i8(self) -> i8 {
-        self as i8
+    fn to_i8(self) -> i8 {
+        i8::from(self)
     }
 }
 
@@ -208,7 +206,7 @@ impl MeshHealer {
         for edge in &mut self.router.edges {
             if edge.from == from && edge.to == to && !edge.alive {
                 edge.alive = true;
-                edge.weight = Ternary::Zero;
+                edge.weight = Ternary::Neutral;
                 return true;
             }
         }
@@ -372,17 +370,17 @@ mod tests {
 
     #[test]
     fn test_ternary_from_i8() {
-        assert_eq!(Ternary::from_i8(-1), Some(Ternary::Neg));
-        assert_eq!(Ternary::from_i8(0), Some(Ternary::Zero));
-        assert_eq!(Ternary::from_i8(1), Some(Ternary::Pos));
+        assert_eq!(Ternary::from_i8(-1), Some(Ternary::Negative));
+        assert_eq!(Ternary::from_i8(0), Some(Ternary::Neutral));
+        assert_eq!(Ternary::from_i8(1), Some(Ternary::Positive));
         assert_eq!(Ternary::from_i8(2), None);
     }
 
     #[test]
     fn test_ternary_to_i8() {
-        assert_eq!(Ternary::Neg.to_i8(), -1);
-        assert_eq!(Ternary::Zero.to_i8(), 0);
-        assert_eq!(Ternary::Pos.to_i8(), 1);
+        assert_eq!(Ternary::Negative.to_i8(), -1);
+        assert_eq!(Ternary::Neutral.to_i8(), 0);
+        assert_eq!(Ternary::Positive.to_i8(), 1);
     }
 
     #[test]
@@ -395,24 +393,24 @@ mod tests {
 
     #[test]
     fn test_mesh_edge_creation() {
-        let edge = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos);
+        let edge = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive);
         assert_eq!(edge.from, NodeId(1));
         assert_eq!(edge.to, NodeId(2));
-        assert_eq!(edge.weight, Ternary::Pos);
+        assert_eq!(edge.weight, Ternary::Positive);
         assert!(edge.alive);
     }
 
     #[test]
     fn test_mesh_edge_bidirectional() {
-        let e1 = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos);
-        let e2 = MeshEdge::new(NodeId(2), NodeId(1), Ternary::Pos);
+        let e1 = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive);
+        let e2 = MeshEdge::new(NodeId(2), NodeId(1), Ternary::Positive);
         assert!(e1.is_bidirectional(&e2));
     }
 
     #[test]
     fn test_mesh_edge_not_bidirectional() {
-        let e1 = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos);
-        let e2 = MeshEdge::new(NodeId(3), NodeId(1), Ternary::Pos);
+        let e1 = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive);
+        let e2 = MeshEdge::new(NodeId(3), NodeId(1), Ternary::Positive);
         assert!(!e1.is_bidirectional(&e2));
     }
 
@@ -437,7 +435,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive));
         assert_eq!(router.edge_count(), 1);
     }
 
@@ -446,7 +444,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive));
         router.remove_node(NodeId(1));
         assert_eq!(router.node_count(), 1);
         assert_eq!(router.edge_count(), 0);
@@ -458,8 +456,8 @@ mod tests {
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
         router.add_node(MeshNode::new(3, "c"));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(3), Ternary::Neg));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(3), Ternary::Negative));
         let nbrs = router.neighbors(NodeId(1));
         assert_eq!(nbrs.len(), 2);
     }
@@ -469,7 +467,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive));
         let path = router.find_path(NodeId(1), NodeId(2));
         assert!(path.is_some());
     }
@@ -496,7 +494,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        let mut edge = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos);
+        let mut edge = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive);
         edge.alive = false;
         router.add_edge(edge);
         let healer = MeshHealer::new(router, 10);
@@ -508,7 +506,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        let mut edge = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos);
+        let mut edge = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive);
         edge.alive = false;
         router.add_edge(edge);
         let mut healer = MeshHealer::new(router, 10);
@@ -522,9 +520,9 @@ mod tests {
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
         router.add_node(MeshNode::new(3, "c"));
-        let mut e1 = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos);
+        let mut e1 = MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive);
         e1.alive = false;
-        let mut e2 = MeshEdge::new(NodeId(2), NodeId(3), Ternary::Pos);
+        let mut e2 = MeshEdge::new(NodeId(2), NodeId(3), Ternary::Positive);
         e2.alive = false;
         router.add_edge(e1);
         router.add_edge(e2);
@@ -538,7 +536,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive));
         let partitions = MeshPartitions::new(router);
         assert_eq!(partitions.partition_count(), 1);
     }
@@ -558,7 +556,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive));
         let partitions = MeshPartitions::new(router);
         assert!(partitions.are_connected(NodeId(1), NodeId(2)));
     }
@@ -596,7 +594,7 @@ mod tests {
         let mut router = MeshRouter::new();
         router.add_node(MeshNode::new(1, "a"));
         router.add_node(MeshNode::new(2, "b"));
-        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Pos));
+        router.add_edge(MeshEdge::new(NodeId(1), NodeId(2), Ternary::Positive));
         let propagated = gossip.propagate(&router);
         assert_eq!(propagated.len(), 1);
         assert_eq!(propagated[0].0, NodeId(2));
